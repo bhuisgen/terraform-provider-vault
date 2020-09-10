@@ -69,6 +69,25 @@ func consulSecretBackendResource() *schema.Resource {
 				Description: "Specifies the Consul ACL token to use. This must be a management type token.",
 				Sensitive:   true,
 			},
+			"ca_cert": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Default:     "",
+				Description: "Specifies the Consul CA certificate to use, provided as a x509 PEM encoded value.",
+			},
+			"client_cert": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Default:     "",
+				Description: "Specifies the Consul client certificate to use, provided as a x509 PEM encoded value.",
+			},
+			"client_key": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Default:     "",
+				Description: "Specifies the Consul client key to use, provided as a x509 PEM encoded value.",
+				Sensitive:   true,
+			},
 		},
 	}
 }
@@ -80,6 +99,9 @@ func consulSecretBackendCreate(d *schema.ResourceData, meta interface{}) error {
 	address := d.Get("address").(string)
 	scheme := d.Get("scheme").(string)
 	token := d.Get("token").(string)
+	caCert := d.Get("ca_cert").(string)
+	clientCert := d.Get("client_cert").(string)
+	clientKey := d.Get("client_key").(string)
 
 	configPath := consulSecretBackendConfigPath(path)
 
@@ -109,9 +131,12 @@ func consulSecretBackendCreate(d *schema.ResourceData, meta interface{}) error {
 
 	log.Printf("[DEBUG] Writing Consul configuration to %q", configPath)
 	data := map[string]interface{}{
-		"address": address,
-		"token":   token,
-		"scheme":  scheme,
+		"address":     address,
+		"token":       token,
+		"scheme":      scheme,
+		"ca_cert":     caCert,
+		"client_cert": clientCert,
+		"client_key":  clientKey,
 	}
 	if _, err := client.Logical().Write(configPath, data); err != nil {
 		return fmt.Errorf("Error writing Consul configuration for %q: %s", path, err)
@@ -120,6 +145,9 @@ func consulSecretBackendCreate(d *schema.ResourceData, meta interface{}) error {
 	d.SetPartial("address")
 	d.SetPartial("token")
 	d.SetPartial("scheme")
+	d.SetPartial("ca_cert")
+	d.SetPartial("client_cert")
+	d.SetPartial("client_key")
 	d.Partial(false)
 
 	return nil
@@ -192,12 +220,16 @@ func consulSecretBackendUpdate(d *schema.ResourceData, meta interface{}) error {
 		d.SetPartial("default_lease_ttl_seconds")
 		d.SetPartial("max_lease_ttl_seconds")
 	}
-	if d.HasChange("address") || d.HasChange("token") || d.HasChange("scheme") {
+	if d.HasChange("address") || d.HasChange("token") || d.HasChange("scheme") ||
+		d.HasChange("ca_cert") || d.HasChange("client_cert") || d.HasChange("client_key") {
 		log.Printf("[DEBUG] Updating Consul configuration at %q", configPath)
 		data := map[string]interface{}{
-			"address": d.Get("address").(string),
-			"token":   d.Get("token").(string),
-			"scheme":  d.Get("scheme").(string),
+			"address":     d.Get("address").(string),
+			"token":       d.Get("token").(string),
+			"scheme":      d.Get("scheme").(string),
+			"ca_cert":     d.Get("ca_cert").(string),
+			"client_cert": d.Get("client_cert").(string),
+			"client_key":  d.Get("client_key").(string),
 		}
 		if _, err := client.Logical().Write(configPath, data); err != nil {
 			return fmt.Errorf("Error configuring Consul configuration for %q: %s", path, err)
@@ -206,6 +238,9 @@ func consulSecretBackendUpdate(d *schema.ResourceData, meta interface{}) error {
 		d.SetPartial("address")
 		d.SetPartial("token")
 		d.SetPartial("scheme")
+		d.SetPartial("ca_cert")
+		d.SetPartial("client_cert")
+		d.SetPartial("client_key")
 	}
 	d.Partial(false)
 	return consulSecretBackendRead(d, meta)

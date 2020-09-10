@@ -11,9 +11,22 @@ import (
 	"github.com/hashicorp/vault/api"
 )
 
+const tlsCACert = `-----BEGIN CERTIFICATE-----
+ABC123
+-----END CERTIFICATE-----`
+
+const tlsClientCert = `-----BEGIN CERTIFICATE-----
+ABC456
+-----END CERTIFICATE-----`
+
+const tlsClientKey = `-----BEGIN PRIVATE KEY-----
+ABC789
+-----END PRIVATE KEY-----`
+
 func TestConsulSecretBackend(t *testing.T) {
 	path := acctest.RandomWithPrefix("tf-test-consul")
 	token := "026a0c16-87cd-4c2d-b3f3-fb539f592b7e"
+
 	resource.Test(t, resource.TestCase{
 		Providers:    testProviders,
 		PreCheck:     func() { testAccPreCheck(t) },
@@ -41,6 +54,21 @@ func TestConsulSecretBackend(t *testing.T) {
 					resource.TestCheckResourceAttr("vault_consul_secret_backend.test", "address", "consul.domain.tld:8501"),
 					resource.TestCheckResourceAttr("vault_consul_secret_backend.test", "token", token),
 					resource.TestCheckResourceAttr("vault_consul_secret_backend.test", "scheme", "https"),
+				),
+			},
+			{
+				Config: testConsulSecretBackend_tlsConfig(path, token, tlsCACert, tlsClientCert, tlsClientKey),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("vault_consul_secret_backend.test", "path", path),
+					resource.TestCheckResourceAttr("vault_consul_secret_backend.test", "description", "test description"),
+					resource.TestCheckResourceAttr("vault_consul_secret_backend.test", "default_lease_ttl_seconds", "3600"),
+					resource.TestCheckResourceAttr("vault_consul_secret_backend.test", "max_lease_ttl_seconds", "86400"),
+					resource.TestCheckResourceAttr("vault_consul_secret_backend.test", "address", "127.0.0.1:8501"),
+					resource.TestCheckResourceAttr("vault_consul_secret_backend.test", "token", token),
+					resource.TestCheckResourceAttr("vault_consul_secret_backend.test", "scheme", "https"),
+					resource.TestCheckResourceAttr("vault_consul_secret_backend.test", "ca_cert", tlsCACert),
+					resource.TestCheckResourceAttr("vault_consul_secret_backend.test", "client_cert", tlsClientCert),
+					resource.TestCheckResourceAttr("vault_consul_secret_backend.test", "client_key", tlsClientKey),
 				),
 			},
 		},
@@ -91,4 +119,20 @@ resource "vault_consul_secret_backend" "test" {
   token = "%s"
   scheme = "https"
 }`, path, token)
+}
+
+func testConsulSecretBackend_tlsConfig(path, token string, ca string, cert string, key string) string {
+	return fmt.Sprintf(`
+resource "vault_consul_secret_backend" "test" {
+  path = "%s"
+  description = "test description"
+  default_lease_ttl_seconds = 3600
+  max_lease_ttl_seconds = 86400
+  address = "127.0.0.1:8501"
+  token = "%s"
+  scheme = "https"
+  ca_cert = %q
+  client_cert = %q
+  client_key = %q
+}`, path, token, ca, cert, key)
 }
